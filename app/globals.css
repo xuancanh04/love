@@ -77,3 +77,38 @@
   box-shadow: 0 0 8px #ffd700;
   animation: sparkle-twinkle 2s ease-in-out infinite;
 }
+
+@keyframes float-heart {
+  0% {
+    transform: translateY(100vh) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.9;
+  }
+  85% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-20vh) scale(1.2);
+    opacity: 0;
+  }
+}
+
+.animate-floating-heart {
+  animation: float-heart var(--drift-time, 6s) linear infinite;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.neon-text-glow {
+  text-shadow: 0 0 10px rgba(255, 105, 180, 0.8),
+               0 0 20px rgba(255, 20, 147, 0.6),
+               0 0 35px rgba(255, 20, 147, 0.4);
+}
