@@ -165,18 +165,53 @@ const DENSE_WISHES_3D = [
 ];
 
 export default function Home() {
-  // Stage: "opening" (Hộp quà) -> "bouquet" (Bó hoa) -> "neon3d" (Màn hình 360 độ)
-  const [stage, setStage] = useState<"opening" | "bouquet" | "neon3d">("opening");
+  // Stage: "opening" (Hộp quà) -> "bouquet" (Bó hoa) -> "neon3d" (Màn hình 360 độ) -> "letter" (Màn hình thư viết) -> "lixi" (Mở bao lì xì)
+  const [stage, setStage] = useState<"opening" | "bouquet" | "neon3d" | "letter" | "lixi">("opening");
   // isRevealed: Khi ở bó hoa, chạm 1 hiện ảnh người lên bó hoa (true)
   const [isRevealed, setIsRevealed] = useState(false);
+  // isEnvelopeOpened: Khi ở màn hình thư viết, chạm phong bì thì mở nắp và thư trượt ra
+  const [isEnvelopeOpened, setIsEnvelopeOpened] = useState(false);
+  // Hiệu ứng đánh chữ (typewriter) khi mở thư
+  const [typedTextLength, setTypedTextLength] = useState(0);
+  // isLixiOpened: Trạng thái khi mở bao lì xì
+  const [isLixiOpened, setIsLixiOpened] = useState(false);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
   const [sparkles, setSparkles] = useState<
     Array<{ id: number; top: number; left: number; size: number; delay: number; duration: number }>
   >([]);
 
-  // Không gian 3D 360 độ: rotation angles & tương tác kéo xoay
-  const [rotY, setRotY] = useState(0);
-  const [rotX, setRotX] = useState(0);
+  // Nội dung bức thư đầy đủ để chạy hiệu ứng đánh chữ
+  const FULL_LETTER_TEXT = `Chúc em yêu của anh 20/10 thật vui vẻ và hạnh phúc nha ❤️🌷 Anh mong cô gái của anh lúc nào cũng xinh đẹp, vui vẻ, luôn được yêu thương và gặp thật nhiều điều tốt đẹp trong cuộc sống. Anh mong em sẽ bớt suy nghĩ, bớt buồn, có chuyện gì cũng có thể chia sẻ với anh, vì anh luôn muốn được ở bên cạnh, lắng nghe và cùng em vượt qua mọi chuyện.
+
+Vậy là tụi mình đã bên nhau hơn 4 năm rồi đó em. Nghĩ lại anh thấy tụi mình đã cùng nhau trải qua biết bao nhiêu chuyện, có những lúc vui vẻ hạnh phúc, cũng có những lúc giận hờn, buồn bã và khó khăn. Nhưng với anh, em vẫn luôn là người rất đặc biệt, là cô gái mà anh thương, muốn quan tâm và muốn cùng đi thật lâu dài. Anh biết đôi khi anh chưa đủ tốt, chưa làm em yên tâm và còn khiến em phải suy nghĩ nhiều, nhưng tình cảm anh dành cho em là thật lòng. Anh vẫn đang cố gắng từng ngày để bản thân tốt hơn, để sau này có thể lo cho em và cho tương lai của hai đứa.
+
+Ngày 20/10, anh không mong gì nhiều, chỉ mong em luôn khỏe mạnh, bình an, lúc nào cũng có nụ cười trên môi. Mong rằng những ngày tháng sau này, dù có chuyện gì xảy ra, tụi mình vẫn có thể nắm tay nhau, cùng nhau cố gắng và vượt qua. Anh không hứa mọi thứ lúc nào cũng sẽ hoàn hảo, nhưng anh muốn mình luôn chân thành với nhau và cùng nhau vun đắp tình cảm này.
+
+Cảm ơn em vì đã đến bên anh, yêu thương anh và cùng anh đi qua hơn 4 năm thanh xuân. Anh thương em nhiều lắm, nhiều khi không biết phải nói sao cho em hiểu hết được. Chúc em yêu của anh có một ngày 20/10 thật hạnh phúc nha. Yêu em nhiều ❤️🥰🌹`;
+
+  // Kích hoạt hiệu ứng đánh chữ khi mở thư
+  useEffect(() => {
+    if (stage === "letter" && isEnvelopeOpened) {
+      setTypedTextLength(0);
+      let index = 0;
+      const interval = setInterval(() => {
+        index += 3;
+        setTypedTextLength((prev) => Math.min(prev + 3, FULL_LETTER_TEXT.length));
+        if (index >= FULL_LETTER_TEXT.length) {
+          clearInterval(interval);
+        }
+      }, 20);
+      return () => clearInterval(interval);
+    } else {
+      setTypedTextLength(0);
+    }
+  }, [stage, isEnvelopeOpened, FULL_LETTER_TEXT.length]);
+
+  // Tự động xoay 360 độ siêu mượt mà dùng ref + requestAnimationFrame (không gây re-render cả cây component 60 lần/giây)
+  const sphereRef = useRef<HTMLDivElement | null>(null);
+  const rotYRef = useRef(0);
+  const rotXRef = useRef(0);
+  const isAutoSpinRef = useRef(true);
   const [isAutoSpin, setIsAutoSpin] = useState(true);
   const isDraggingRef = useRef(false);
   const lastMousePosRef = useRef({ x: 0, y: 0 });
@@ -219,19 +254,28 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Tự động xoay 360 độ mượt mà khi ở màn hình neon3d
+  // Vòng lặp animation 60fps trực tiếp trên GPU transform
+  useEffect(() => {
+    isAutoSpinRef.current = isAutoSpin;
+  }, [isAutoSpin]);
+
   useEffect(() => {
     if (stage !== "neon3d") return;
     let frameId: number;
-    const spinLoop = () => {
-      if (isAutoSpin && !isDraggingRef.current) {
-        setRotY((prev) => (prev + 0.35) % 360);
+
+    const renderLoop = () => {
+      if (isAutoSpinRef.current && !isDraggingRef.current) {
+        rotYRef.current = (rotYRef.current + 0.35) % 360;
       }
-      frameId = requestAnimationFrame(spinLoop);
+      if (sphereRef.current) {
+        sphereRef.current.style.transform = `rotateX(${rotXRef.current}deg) rotateY(${rotYRef.current}deg)`;
+      }
+      frameId = requestAnimationFrame(renderLoop);
     };
-    frameId = requestAnimationFrame(spinLoop);
+
+    frameId = requestAnimationFrame(renderLoop);
     return () => cancelAnimationFrame(frameId);
-  }, [stage, isAutoSpin]);
+  }, [stage]);
 
   const toggleMusic = () => {
     if (!audioRef.current) return;
@@ -246,9 +290,7 @@ export default function Home() {
     }
   };
 
-  // Xử lý chạm / click:
-  // - Nếu chưa hiện ảnh (isRevealed = false): chạm sẽ hiện ảnh lên bó hoa
-  // - Khi đã hiện ảnh (isRevealed = true): chạm tiếp theo qua màn hình 360 độ ngập tràn ảnh và lời chúc
+  // Xử lý chạm / click
   const handleStageClick = () => {
     if (stage === "bouquet") {
       if (!isRevealed) {
@@ -261,7 +303,7 @@ export default function Home() {
     }
   };
 
-  // Kéo xoay 360 độ bằng chuột / cảm ứng
+  // Kéo xoay 360 độ mượt mà bằng chuột / cảm ứng trên mobile
   const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
     if (stage !== "neon3d") return;
     isDraggingRef.current = true;
@@ -277,8 +319,12 @@ export default function Home() {
     const deltaX = clientX - lastMousePosRef.current.x;
     const deltaY = clientY - lastMousePosRef.current.y;
 
-    setRotY((prev) => prev + deltaX * 0.45);
-    setRotX((prev) => Math.max(-45, Math.min(45, prev - deltaY * 0.25)));
+    rotYRef.current = (rotYRef.current + deltaX * 0.45) % 360;
+    rotXRef.current = Math.max(-45, Math.min(45, rotXRef.current - deltaY * 0.25));
+
+    if (sphereRef.current) {
+      sphereRef.current.style.transform = `rotateX(${rotXRef.current}deg) rotateY(${rotYRef.current}deg)`;
+    }
 
     lastMousePosRef.current = { x: clientX, y: clientY };
   };
@@ -298,7 +344,7 @@ export default function Home() {
       onTouchStart={handlePointerDown}
       onTouchMove={handlePointerMove}
       onTouchEnd={handlePointerUp}
-      className="fixed inset-0 w-full h-[100dvh] overflow-hidden bg-black select-none cursor-pointer"
+      className="fixed inset-0 w-full h-[100dvh] overflow-hidden bg-black select-none cursor-pointer touch-none"
     >
       {/* Background Audio */}
       <audio
@@ -540,10 +586,8 @@ export default function Home() {
           {/* KHÔNG GIAN 3D 360 ĐỘ XOAY TRÒN VỚI NHIỀU TẦNG ẢNH VÀ LỜI CHÚC DÀY ĐẶC */}
           <div className="absolute inset-0 flex items-center justify-center preserve-3d">
             <div
-              className="relative w-0 h-0 preserve-3d transition-transform duration-75 ease-out"
-              style={{
-                transform: `rotateX(${rotX}deg) rotateY(${rotY}deg)`,
-              }}
+              ref={sphereRef}
+              className="relative w-0 h-0 preserve-3d will-change-transform"
             >
               {/* 1. CỤM NHIỀU ẢNH (NHỎ - VỪA - LỚN) CHẠY XUNG QUANH NHIỀU TẦNG ĐỘ CAO */}
               {CLUSTER_PHOTOS.map((p, idx) => (
@@ -589,18 +633,298 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Dòng chữ ở đáy màn hình */}
-          <div className="absolute bottom-5 inset-x-0 z-50 flex flex-col items-center gap-1.5">
+
+          {/* Phong bì thư to ở GÓC PHẢI MÀN HÌNH (thuần phong bì, không bọc khung ngoài) */}
+          <div className="absolute bottom-5 right-5 z-50">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setStage("bouquet");
+                shootConfetti(0.4);
+                setStage("letter");
+                setIsEnvelopeOpened(false);
               }}
-              className="text-xs text-pink-200/80 hover:text-white underline underline-offset-4 tracking-wider bg-black/40 px-3.5 py-1.5 rounded-full border border-pink-500/20 backdrop-blur-sm"
+              className="relative p-0 bg-transparent border-0 outline-none active:scale-90 transition-transform cursor-pointer animate-bounce drop-shadow-[0_8px_16px_rgba(255,105,180,0.5)]"
+              style={{ animationDuration: "2.5s" }}
+              title="Mở phong bì thư"
             >
-              Chạm để quay lại bó hoa 💐
+              {/* Chỉ duy nhất chiếc phong bì thư to sắc nét, không bọc khung bên ngoài */}
+              <div className="relative w-16 h-11 sm:w-20 sm:h-14 bg-gradient-to-b from-[#fff5f7] to-[#fde2e8] rounded-xl shadow-lg border border-pink-200/80 overflow-hidden flex items-center justify-center">
+                {/* Họa tiết hoa 2 bên góc dưới */}
+                <span className="absolute bottom-0.5 left-1 text-[11px] opacity-75 pointer-events-none select-none">
+                  🌸
+                </span>
+                <span className="absolute bottom-0.5 right-1 text-[11px] opacity-75 pointer-events-none select-none">
+                  🌸
+                </span>
+                {/* Đường gấp nắp phong bì hình tam giác */}
+                <div
+                  className="absolute top-0 inset-x-0 h-[62%] bg-gradient-to-b from-white to-[#fcdbe3] border-b border-pink-300/50 shadow-sm"
+                  style={{ clipPath: "polygon(0 0, 100% 0, 50% 100%)" }}
+                />
+                {/* Số 20/10 nhỏ in trên nắp */}
+                <span className="absolute top-0.5 z-10 text-[9px] font-bold text-rose-500/80 font-serif">
+                  20/10
+                </span>
+                {/* Con dấu sáp đỏ dập nổi ở chính giữa */}
+                <div className="relative z-10 w-4.5 h-4.5 rounded-full bg-gradient-to-tr from-rose-700 via-rose-500 to-pink-500 shadow-[0_2px_8px_rgba(225,29,72,0.6)] border border-rose-300/60 flex items-center justify-center">
+                  <span className="text-[7px] text-white font-bold font-serif italic">
+                    ♥
+                  </span>
+                </div>
+              </div>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* BƯỚC 4: MÀN HÌNH BỨC THƯ VIẾT TAY DÀNH TẶNG EM 20/10 CHUẨN MẪU */}
+      {stage === "letter" && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center px-4 overflow-y-auto animate-in fade-in zoom-in-95 duration-500">
+          {/* Header quay lại */}
+          <div className="absolute top-5 left-5 z-50">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setStage("neon3d");
+              }}
+              className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/15 text-pink-200 active:scale-90 transition-transform"
+              title="Quay lại kỷ niệm 3D"
+            >
+              <ArrowLeft className="w-4 h-4 text-pink-300" />
+            </button>
+          </div>
+
+          {/* VÙNG PHONG BÌ & LÁ THƯ */}
+          <div className="relative w-full max-w-[390px] my-auto py-8 flex flex-col items-center">
+            {!isEnvelopeOpened ? (
+              /* PHONG BÌ CHƯA MỞ (Chuẩn mẫu thiết kế trong video) */
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  shootConfetti(0.45);
+                  setIsEnvelopeOpened(true);
+                }}
+                className="relative w-full aspect-[1.45/1] bg-gradient-to-b from-[#fff2f5] to-[#fde2e8] rounded-2xl shadow-[0_15px_45px_rgba(0,0,0,0.6),0_0_30px_rgba(255,182,193,0.3)] border border-pink-200/60 overflow-hidden cursor-pointer animate-envelope-float active:scale-95 transition-transform select-none"
+              >
+                {/* Họa tiết hoa hồng đào trang trí 2 góc dưới */}
+                <div className="absolute bottom-1 left-1.5 text-2xl opacity-80 pointer-events-none select-none">
+                  🌸🌸
+                </div>
+                <div className="absolute bottom-1 right-1.5 text-2xl opacity-80 pointer-events-none select-none">
+                  🌸🌸
+                </div>
+
+                {/* Đường gấp nắp phong bì hình tam giác nhẹ */}
+                <div
+                  className="absolute top-0 inset-x-0 h-[62%] bg-gradient-to-b from-white/90 to-[#fcdbe3]/90 shadow-sm border-b border-pink-300/40"
+                  style={{
+                    clipPath: "polygon(0 0, 100% 0, 50% 100%)",
+                  }}
+                />
+
+                {/* Chữ in trên nắp phong bì */}
+                <div className="relative z-10 pt-4 flex flex-col items-center text-center">
+                  <span className="text-[11px] font-medium tracking-widest text-gray-500 uppercase">
+                    Dành tặng em
+                  </span>
+                  <span className="text-[10px] text-pink-400">♥</span>
+                  <h2 className="text-3xl font-serif font-bold text-rose-500/90 tracking-wide mt-0.5">
+                    20/10
+                  </h2>
+                  <p className="text-[10px] text-gray-400 italic font-light tracking-wider">
+                    Một chút yêu thương
+                  </p>
+                </div>
+
+                {/* Con dấu sáp đỏ hồng niêm phong chính giữa có chữ DLove */}
+                <div className="absolute top-[52%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-rose-700 via-rose-500 to-pink-500 shadow-[0_4px_12px_rgba(225,29,72,0.5)] border-2 border-rose-300/60 flex items-center justify-center">
+                    <span className="text-[11px] font-bold tracking-tight text-white italic drop-shadow-sm font-serif">
+                      DLove
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* LÁ THƯ VIẾT TAY TRƯỢT MỞ RA */
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-h-[82vh] overflow-y-auto bg-gradient-to-b from-[#fffbf8] via-[#fff5f7] to-[#ffeef3] rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-pink-200/80 p-5 sm:p-7 text-gray-800 animate-letter-open cursor-default"
+              >
+                {/* Viền hoa trang trí góc thư */}
+                <div className="flex items-center justify-between border-b border-pink-200/70 pb-3">
+                  <div>
+                    <span className="text-[10px] tracking-widest text-pink-400 font-semibold uppercase">
+                      Thư gửi người anh thương 💌
+                    </span>
+                    <h3 className="text-xl font-serif font-bold text-gray-800 mt-0.5">
+                      Chúc Mừng 20/10
+                    </h3>
+                  </div>
+                  <span className="text-2xl">🌹</span>
+                </div>
+
+                {/* Nội dung bức thư viết tay tình cảm với hiệu ứng đánh chữ typewriter */}
+                <div className="mt-4 space-y-3 text-xs sm:text-[13px] leading-relaxed text-gray-700 font-normal min-h-[220px]">
+                  <div className="whitespace-pre-line leading-relaxed">
+                    {FULL_LETTER_TEXT.slice(0, typedTextLength)}
+                    {typedTextLength < FULL_LETTER_TEXT.length && (
+                      <span className="inline-block w-1.5 h-3.5 bg-pink-500 ml-0.5 animate-pulse" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Nút bấm qua tiếp mở lì xì */}
+                <div className="mt-5 pt-3 border-t border-pink-200/60 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEnvelopeOpened(false)}
+                    className="text-[11px] text-gray-400 hover:text-gray-600 font-light"
+                  >
+                    Xem lại phong bì ✉️
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      shootConfetti(0.4);
+                      setStage("lixi");
+                      setIsLixiOpened(false);
+                    }}
+                    className="flex items-center gap-1 px-4 py-2 rounded-full bg-gradient-to-r from-red-500 via-rose-500 to-amber-500 text-white font-medium text-xs shadow-[0_4px_15px_rgba(239,68,68,0.4)] active:scale-95 transition-all"
+                  >
+                    <span>Mở lì xì nè</span>
+                    <span>🧧</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Dòng chữ hướng dẫn dưới phong bì chuẩn như trong ảnh */}
+            {!isEnvelopeOpened && (
+              <p className="mt-5 text-xs text-gray-300 font-light tracking-wider animate-pulse">
+                Chạm phong bì để mở thư
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* BƯỚC 5: MÀN HÌNH MỞ BAO LÌ XÌ MAY MẮN 20/10 */}
+      {stage === "lixi" && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center px-4 overflow-y-auto animate-in fade-in zoom-in-95 duration-500 select-none">
+          {/* Header quay lại */}
+          <div className="absolute top-5 left-5 z-50">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setStage("letter");
+              }}
+              className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/15 text-pink-200 active:scale-90 transition-transform"
+              title="Quay lại bức thư"
+            >
+              <ArrowLeft className="w-4 h-4 text-pink-300" />
+            </button>
+          </div>
+
+          {/* VÙNG BAO LÌ XÌ */}
+          <div className="relative w-full max-w-[320px] flex flex-col items-center">
+            {!isLixiOpened ? (
+              /* BAO LÌ XÌ ĐỎ ĐẶC TRƯNG CHƯA MỞ */
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  shootConfetti(0.45);
+                  setIsLixiOpened(true);
+                }}
+                className="relative w-full aspect-[1/1.55] bg-gradient-to-b from-[#e61e2b] via-[#d61320] to-[#b00c17] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.7),0_0_40px_rgba(230,30,43,0.35)] border border-amber-300/40 overflow-hidden cursor-pointer animate-envelope-float active:scale-95 transition-transform"
+              >
+                {/* Viền hoa văn kim tuyến vàng ở 4 góc */}
+                <div className="absolute top-3 left-3 text-amber-200/80 text-sm">✦</div>
+                <div className="absolute top-3 right-3 text-amber-200/80 text-sm">✦</div>
+                <div className="absolute bottom-3 left-3 text-amber-200/80 text-sm">✦</div>
+                <div className="absolute bottom-3 right-3 text-amber-200/80 text-sm">✦</div>
+
+                {/* Nắp bao lì xì cong hình vòng cung */}
+                <div
+                  className="absolute top-0 inset-x-0 h-[38%] bg-gradient-to-b from-[#ff3342] to-[#d61320] shadow-md border-b-2 border-amber-300/70"
+                  style={{ borderRadius: "0 0 50% 50% / 0 0 100% 100%" }}
+                />
+
+                {/* Tiêu đề mạ vàng trên nắp */}
+                <div className="relative z-10 pt-5 text-center">
+                  <p className="text-xs uppercase tracking-widest text-amber-200/90 font-medium font-serif">
+                    Lì Xì Yêu Thương
+                  </p>
+                  <p className="text-[10px] text-amber-100/70 font-light mt-0.5">
+                    Dành riêng cho em 20/10
+                  </p>
+                </div>
+
+                {/* Đồng xu vàng may mắn ở tâm điểm nắp */}
+                <div className="absolute top-[38%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 w-14 h-14 rounded-full bg-gradient-to-tr from-amber-600 via-amber-300 to-yellow-100 shadow-[0_0_20px_rgba(251,191,36,0.6)] border-2 border-amber-200 flex items-center justify-center animate-pulse">
+                  <span className="text-xl font-bold text-red-700 font-serif">
+                    福
+                  </span>
+                </div>
+
+                {/* Chữ vàng chúc mừng ở thân bao lì xì */}
+                <div className="absolute bottom-10 inset-x-0 text-center px-4">
+                  <h3 className="text-2xl font-serif font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-100 via-amber-200 to-yellow-300 drop-shadow-sm tracking-wide">
+                    CHÚC MỪNG 20/10
+                  </h3>
+                  <p className="text-xs text-amber-200/80 italic mt-1 font-light">
+                    Chạm để nhận lì xì ngọt ngào nha!
+                  </p>
+                </div>
+              </div>
+            ) : (
+              /* THIỆP CHÚC MỪNG LÌ XÌ TRƯỢT LÊN */
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="relative w-full max-w-[340px] flex flex-col items-center animate-letter-open cursor-default"
+              >
+                {/* Khung chúc mừng & quà tặng lì xì 500k */}
+                <div className="w-full bg-gradient-to-b from-[#fffef5] via-[#fff9e8] to-[#fef0cb] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] border-2 border-amber-300 p-6 text-center">
+                  <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-tr from-rose-500 to-amber-400 flex items-center justify-center text-3xl shadow-[0_0_25px_rgba(245,158,11,0.5)]">
+                    🧧
+                  </div>
+
+                  <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-600 font-bold text-xs">
+                    <span>🎉</span>
+                    <span>Ting Ting! Đã nhận lì xì 1.000.000 đ</span>
+                  </div>
+
+                  <h3 className="mt-2 text-xl font-serif font-bold text-red-600">
+                    Lì Xì 20/10 Cho Em Yêu!
+                  </h3>
+
+                  <p className="mt-3 text-xs leading-relaxed text-gray-700 font-normal">
+                    Lì xì cho em bé 1 triệu đi ăn uống thả ga, mua những món em thích nha! Chúc em luôn xinh đẹp, vui vẻ và lúc nào cũng ngập tràn hạnh phúc bên anh ❤️
+                  </p>
+
+                  {/* Nút bấm gấp lại bao lì xì */}
+                  <div className="mt-5 pt-3 border-t border-amber-200/70 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setIsLixiOpened(false)}
+                      className="text-xs text-amber-700 hover:text-amber-900 font-medium underline underline-offset-4 active:scale-95 transition-transform"
+                    >
+                      Gấp lại bao lì xì 🧧
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Chú thích ở dưới bao lì xì */}
+            {!isLixiOpened && (
+              <p className="mt-5 text-xs text-amber-200/90 font-light tracking-wider animate-pulse">
+                Chạm vào bao lì xì để mở nha ✨
+              </p>
+            )}
           </div>
         </div>
       )}
