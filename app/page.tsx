@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import confetti from "canvas-confetti";
-import { Volume2, VolumeX, ArrowLeft, Rotate3d, Sparkles } from "lucide-react";
+import { Volume2, VolumeX, ArrowLeft, Rotate3d } from "lucide-react";
 
 // Bố cục 6 vị trí người với 6 bộ trang phục/tạo dáng hoàn toàn khác nhau ở Màn 2:
 const CUTOUT_PORTRAITS = [
@@ -176,9 +176,26 @@ export default function Home() {
   // isLixiOpened: Trạng thái khi mở bao lì xì
   const [isLixiOpened, setIsLixiOpened] = useState(false);
   const [isPlayingMusic, setIsPlayingMusic] = useState(false);
-  const [sparkles, setSparkles] = useState<
+  const [sparkles] = useState<
     Array<{ id: number; top: number; left: number; size: number; delay: number; duration: number }>
-  >([]);
+  >([
+    { id: 0, top: 12, left: 15, size: 2.2, delay: 0.2, duration: 2.8 },
+    { id: 1, top: 25, left: 78, size: 1.8, delay: 0.8, duration: 3.2 },
+    { id: 2, top: 38, left: 22, size: 2.5, delay: 1.5, duration: 2.4 },
+    { id: 3, top: 52, left: 88, size: 1.5, delay: 0.5, duration: 3.6 },
+    { id: 4, top: 68, left: 12, size: 2.8, delay: 1.8, duration: 2.2 },
+    { id: 5, top: 82, left: 75, size: 1.6, delay: 1.1, duration: 3.0 },
+    { id: 6, top: 18, left: 45, size: 2.0, delay: 2.2, duration: 2.5 },
+    { id: 7, top: 88, left: 35, size: 2.4, delay: 0.4, duration: 3.4 },
+    { id: 8, top: 32, left: 92, size: 1.7, delay: 1.9, duration: 2.7 },
+    { id: 9, top: 72, left: 55, size: 2.3, delay: 1.3, duration: 3.1 },
+    { id: 10, top: 8, left: 85, size: 1.9, delay: 2.6, duration: 2.6 },
+    { id: 11, top: 62, left: 30, size: 2.1, delay: 0.7, duration: 3.5 },
+    { id: 12, top: 44, left: 65, size: 1.4, delay: 1.6, duration: 2.9 },
+    { id: 13, top: 92, left: 18, size: 2.6, delay: 2.4, duration: 2.3 },
+    { id: 14, top: 28, left: 8, size: 1.8, delay: 0.3, duration: 3.3 },
+    { id: 15, top: 85, left: 90, size: 2.0, delay: 2.0, duration: 2.8 },
+  ]);
 
   // Nội dung bức thư đầy đủ để chạy hiệu ứng đánh chữ
   const FULL_LETTER_TEXT = `Chúc em yêu của anh 20/10 thật vui vẻ và hạnh phúc nha ❤️🌷 Anh mong cô gái của anh lúc nào cũng xinh đẹp, vui vẻ, luôn được yêu thương và gặp thật nhiều điều tốt đẹp trong cuộc sống. Anh mong em sẽ bớt suy nghĩ, bớt buồn, có chuyện gì cũng có thể chia sẻ với anh, vì anh luôn muốn được ở bên cạnh, lắng nghe và cùng em vượt qua mọi chuyện.
@@ -192,18 +209,16 @@ Cảm ơn em vì đã đến bên anh, yêu thương anh và cùng anh đi qua h
   // Kích hoạt hiệu ứng đánh chữ khi mở thư
   useEffect(() => {
     if (stage === "letter" && isEnvelopeOpened) {
-      setTypedTextLength(0);
-      let index = 0;
       const interval = setInterval(() => {
-        index += 3;
-        setTypedTextLength((prev) => Math.min(prev + 3, FULL_LETTER_TEXT.length));
-        if (index >= FULL_LETTER_TEXT.length) {
-          clearInterval(interval);
-        }
+        setTypedTextLength((prev) => {
+          if (prev >= FULL_LETTER_TEXT.length) {
+            clearInterval(interval);
+            return prev;
+          }
+          return Math.min(prev + 3, FULL_LETTER_TEXT.length);
+        });
       }, 20);
       return () => clearInterval(interval);
-    } else {
-      setTypedTextLength(0);
     }
   }, [stage, isEnvelopeOpened, FULL_LETTER_TEXT.length]);
 
@@ -232,16 +247,6 @@ Cảm ơn em vì đã đến bên anh, yêu thương anh và cùng anh đi qua h
   };
 
   useEffect(() => {
-    const items = Array.from({ length: 24 }).map((_, i) => ({
-      id: i,
-      top: Math.random() * 92 + 4,
-      left: Math.random() * 92 + 4,
-      size: Math.random() * 2 + 1.2,
-      delay: Math.random() * 3,
-      duration: Math.random() * 2 + 2,
-    }));
-    setSparkles(items);
-
     if (audioRef.current) {
       audioRef.current.play().then(() => setIsPlayingMusic(true)).catch(() => {});
     }

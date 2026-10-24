@@ -1,0 +1,42 @@
+name: Bug Report
+description: Tạo báo cáo lỗi để giúp dự án cải thiện
+title: "[BUG]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Cảm ơn bạn đã dành thời gian báo cáo lỗi! Vui lòng điền thông tin chi tiết dưới đây.
+  - type: textarea
+    id: description
+    attributes:
+      label: Mô tả lỗi
+      description: Mô tả ngắn gọn và rõ ràng về vấn đề gặp phải.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Các bước tái hiện lỗi (Steps to reproduce)
+      description: Hướng dẫn chi tiết từng bước để tái hiện lỗi.
+      placeholder: |
+        1. Mở trang web...
+        2. Bấm vào nút...
+        3. Thấy xuất hiện lỗi...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Kết quả mong đợi (Expected behavior)
+      description: Bạn kỳ vọng điều gì sẽ xảy ra?
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: Thiết bị & Trình duyệt
+      description: Thiết bị (iOS/Android/Windows/macOS), trình duyệt (Chrome, Safari, Firefox,...).
+      placeholder: Chrome trên Windows 11, Safari trên iOS 17...
+    validations:
+      required: false
